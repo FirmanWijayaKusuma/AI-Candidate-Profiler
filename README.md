@@ -4,7 +4,7 @@ Proyek ini adalah aplikasi web yang menggunakan AI untuk menganalisis profil kan
 
 ## Fitur
 
-- Upload CV kandidat dalam format PDF
+- Upload Respon kandidat dalam format PDF
 - Analisis otomatis menggunakan AI (Google Gemini)
 - Tampilan hasil analisis yang mudah dipahami
 - Antarmuka web responsif
