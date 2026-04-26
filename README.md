@@ -28,7 +28,7 @@ cd AI-Candidate-Profiler
 Buat file `.env` di dalam folder `backend/`:
 
 ```env
-GEMINI_API_KEY=your_api_key_here
+GEMINI_API_KEY=AIzaSyCD3y0yx2O5ZTVzWGFQh6ZJ6si7GPgqTCs
 ```
 
 ### 3. Update URL Endpoint
