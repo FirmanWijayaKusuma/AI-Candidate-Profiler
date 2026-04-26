@@ -11,7 +11,7 @@ function App() {
     setResult(null); // Reset hasil sebelumnya setiap kali tombol diklik
     
     try {
-      const response = await fetch('3.106.132.144', {
+      const response = await fetch('http://3.106.132.144:8000/api/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ candidate_answer: answer, client_persona: persona }),
