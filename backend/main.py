@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, types
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
@@ -7,7 +7,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = genai.Client()
+# 1. KONFIGURASI API KEY (Sintaks Standar)
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# 2. INISIALISASI MODEL
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 app = FastAPI()
 
@@ -38,14 +42,14 @@ async def evaluate_candidate(data: EvaluationRequest):
     """
     
     try:
-        response = client.models.generate_content(
-            model = genai.GenerativeModel('gemini-1.5-flash'), 
-            contents=prompt,
-            config={
-                'response_mime_type': 'application/json' 
+        # 3. GENERASI KONTEN (Sintaks Standar)
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json"
             }
         )
-        # Langsung kembalikan teksnya
+        # Langsung kembalikan teks JSON-nya
         return response.text
     except Exception as e:
         print(f"Error AI: {e}")
