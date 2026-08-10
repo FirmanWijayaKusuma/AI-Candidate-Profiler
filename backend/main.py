@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, types
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from google import genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
