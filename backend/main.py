@@ -39,7 +39,7 @@ async def evaluate_candidate(data: EvaluationRequest):
     
     try:
         response = client.models.generate_content(
-            model = "genai-3.5-turbo", 
+            model = "genai-2.5-turbo", 
             contents=prompt,
             config={
                 'response_mime_type': 'application/json' 
