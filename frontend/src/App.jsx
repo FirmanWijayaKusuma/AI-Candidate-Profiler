@@ -1,110 +1,173 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from "react";
+import PersonaPicker from "./components/PersonaPicker";
+import ResultPanel from "./components/ResultPanel";
+import { PERSONAS, SAMPLE } from "./personas";
 
-function App() {
-  const [answer, setAnswer] = useState('');
-  const [persona, setPersona] = useState('Corporate Consultant');
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const GITHUB_URL = "https://github.com/FirmanWijayaKusuma/AI-Candidate-Profiler"; // cek ulang link repo
+const PORTFOLIO_URL = "https://firmanwijayaportfolio.lovable.app";
+const KEY = "acp-history";
+const MAX = 1500;
+
+const ago = (t) => {
+  const m = Math.round((Date.now() - t) / 60000);
+  return m < 1 ? "Baru saja" : m < 60 ? `${m} menit lalu` : m < 1440 ? `${Math.round(m / 60)} jam lalu` : `${Math.round(m / 1440)} hari lalu`;
+};
+
+export default function App() {
+  const [persona, setPersona] = useState("korporat");
+  const [custom, setCustom] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | loading | success | error
   const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [step, setStep] = useState(0);
+  const [history, setHistory] = useState([]);
 
-  const handleEvaluate = async () => {
-    setLoading(true);
-    setResult(null); // Reset hasil sebelumnya setiap kali tombol diklik
-    
+  const personaName = PERSONAS.find((p) => p.id === persona).name;
+  const ready = answer.trim().length >= 20 && (persona !== "custom" || custom.trim().length >= 5);
+
+  useEffect(() => {
+    try { setHistory(JSON.parse(localStorage.getItem(KEY)) || []); } catch { /* abaikan */ }
+  }, []);
+
+  useEffect(() => {
+    if (status !== "loading") return;
+    setStep(0);
+    const t = setInterval(() => setStep((s) => Math.min(s + 1, 2)), 1500);
+    return () => clearInterval(t);
+  }, [status]);
+
+  const saveHistory = (next) => {
+    setHistory(next);
+    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* abaikan */ }
+  };
+
+  const analyze = async () => {
+    setStatus("loading");
+    setError("");
     try {
-      const response = await fetch('http://3.107.168.133:8000/api/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate_answer: answer, client_persona: persona }),
+      const res = await fetch(`${API_URL}/api/evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate_answer: answer,
+          persona,
+          custom_description: persona === "custom" ? custom : null,
+        }),
       });
-
-      if (!response.ok) {
-        throw new Error(`Gagal terhubung ke backend (Status HTTP: ${response.status})`);
-      }
-
-      const rawData = await response.json();
-      
-      // Kadang data datang sebagai string, kadang sebagai objek langsung
-      const parsedData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-      
-      setResult(parsedData);
-      
-    } catch (error) {
-      console.error("Detail Error:", error);
-      // Alih-alih pakai alert yang mengganggu, kita set error ke state agar tampil rapi di UI
-      setResult({ error: error.message });
-    } finally {
-      setLoading(false);
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Isian belum valid. Jawaban minimal 20 karakter.");
+      setResult(data);
+      setStatus("success");
+      saveHistory([{ persona: personaName, score: data.score, at: Date.now() }, ...history].slice(0, 4));
+    } catch (e) {
+      setError(e.message === "Failed to fetch" ? "Gagal menghubungi server. Cek koneksi Anda lalu coba lagi." : e.message);
+      setStatus("error");
     }
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: 'auto', fontFamily: 'sans-serif' }}>
-      <h2>AI Candidate Profiler</h2>
-      
-      <label style={{ fontWeight: 'bold' }}>Pilih Tipe Ekspektasi Klien:</label>
-      <select 
-        value={persona} 
-        onChange={(e) => setPersona(e.target.value)} 
-        style={{ width: '100%', padding: '8px', marginBottom: '15px', marginTop: '5px', borderRadius: '4px' }}
-      >
-        <option value="Corporate Consultant">Corporate Consultant (Formal & Structured)</option>
-        <option value="Agile Startup">Agile Startup (Fast-paced & Scrappy)</option>
-      </select>
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-line">
+        <nav className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+          <span className="font-extrabold text-primary">AI Candidate Profiler</span>
+          <div className="flex items-center gap-5 text-sm font-medium">
+            <a href="#cara-kerja" className="hidden sm:inline hover:text-primary">Cara Kerja</a>
+            <a href="#tech" className="hidden sm:inline hover:text-primary">Tech Stack</a>
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="hover:text-primary">GitHub</a>
+            <a href="#tool" className="px-4 py-2 rounded-lg bg-primary text-white whitespace-nowrap">Coba Sekarang</a>
+          </div>
+        </nav>
+      </header>
 
-      <label style={{ fontWeight: 'bold' }}>Transkrip Jawaban Kandidat:</label>
-      <textarea 
-        placeholder="Ketik atau paste transkrip jawaban kandidat di sini..."
-        value={answer}
-        onChange={(e) => setAnswer(e.target.value)}
-        rows="6"
-        style={{ width: '100%', padding: '8px', marginBottom: '15px', marginTop: '5px', borderRadius: '4px' }}
-      />
-
-      <button 
-        onClick={handleEvaluate} 
-        disabled={loading || answer.trim() === ''}
-        style={{ 
-          padding: '10px 15px', 
-          backgroundColor: loading || answer.trim() === '' ? '#ccc' : '#007bff', 
-          color: 'white', 
-          border: 'none', 
-          borderRadius: '4px',
-          cursor: loading || answer.trim() === '' ? 'not-allowed' : 'pointer',
-          width: '100%',
-          fontWeight: 'bold'
-        }}
-      >
-        {loading ? 'AI Sedang Menganalisis...' : 'Analisis Jawaban'}
-      </button>
-
-      {/* Tampilan UI Jika AI Mengembalikan Error (Misal: Limit Kuota) */}
-      {result && result.error && (
-        <div style={{ marginTop: '20px', border: '1px solid #f5c6cb', padding: '15px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '5px' }}>
-          <h3 style={{ marginTop: 0 }}>Gagal Menganalisis</h3>
-          <p><strong>Pesan Sistem:</strong> {result.error}</p>
-          <p style={{ fontSize: '0.9em' }}>*Pastikan API Key valid, limit belum habis, dan backend berjalan.</p>
+      <section className="max-w-3xl mx-auto px-4 pt-16 pb-12 text-center">
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">Uji jawaban kandidat sesuai gaya klien</h1>
+        <p className="mt-4 text-muted">Jawaban yang sama bisa dinilai berbeda oleh klien yang berbeda. Tempel jawaban, pilih klien, dan lihat skor beserta tips perbaikannya.</p>
+        <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-muted">
+          <span>9 persona klien</span><span>Ditenagai Gemini API</span><span>Bahasa Indonesia</span>
         </div>
-      )}
+      </section>
 
-      {/* Tampilan UI Jika Analisis Berhasil */}
-      {result && !result.error && result.score !== undefined && (
-        <div style={{ marginTop: '20px', border: '1px solid #c3e6cb', padding: '15px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '5px' }}>
-          <h3 style={{ marginTop: 0, borderBottom: '1px solid #c3e6cb', paddingBottom: '10px' }}>
-            Skor Kecocokan: {result.score}/100
-          </h3>
-          <p><strong>Analisis:</strong> <br/> {result.analysis}</p>
-          
-          <p style={{ marginTop: '15px' }}><strong>Tips Briefing Sebelum Bertemu Klien:</strong></p>
-          <ul style={{ paddingLeft: '20px', margin: 0 }}>
-            {/* Optional Chaining (?.) mencegah crash jika AI lupa memberikan list tips */}
-            {result.improvement_tips?.map((tip, i) => (
-              <li key={i} style={{ marginBottom: '8px' }}>{tip}</li>
+      <main id="tool" className="max-w-6xl mx-auto px-4 grid lg:grid-cols-2 gap-6">
+        <section className="p-5 rounded-2xl bg-white border border-line shadow-sm space-y-4">
+          <h2 className="font-bold">1. Pilih tipe ekspektasi klien</h2>
+          <PersonaPicker value={persona} onChange={setPersona} />
+          {persona === "custom" && (
+            <input value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={300}
+              placeholder="Contoh: klien manufaktur yang mengutamakan keselamatan kerja"
+              className="w-full p-3 rounded-xl border border-line text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          )}
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold">2. Transkrip jawaban kandidat</h2>
+            <button type="button" onClick={() => setAnswer(SAMPLE)} className="text-sm text-primary font-semibold">Coba contoh jawaban</button>
+          </div>
+          <div>
+            <textarea value={answer} onChange={(e) => setAnswer(e.target.value.slice(0, MAX))} rows={8}
+              placeholder="Tempel jawaban kandidat di sini (minimal 20 karakter)"
+              className="w-full p-3 rounded-xl border border-line text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            <p className="mt-1 text-right text-xs text-muted">{answer.length} / {MAX} karakter</p>
+          </div>
+          <button onClick={analyze} disabled={!ready || status === "loading"}
+            className="w-full py-3 rounded-xl bg-primary text-white font-bold disabled:opacity-40">
+            {status === "loading" ? "Menganalisis..." : "Analisis Jawaban"}
+          </button>
+        </section>
+
+        <section className="p-5 rounded-2xl bg-white border border-line shadow-sm">
+          <ResultPanel status={status} result={result} error={error} step={step} personaName={personaName} onRetry={analyze} />
+        </section>
+      </main>
+
+      {history.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 mt-12">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-lg">Riwayat Analisis</h2>
+            <button onClick={() => saveHistory([])} className="text-sm text-muted hover:text-danger">Hapus riwayat</button>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {history.map((h, i) => (
+              <div key={i} className="p-4 rounded-xl bg-white border border-line">
+                <p className="text-xs text-muted">{ago(h.at)}</p>
+                <p className="font-semibold text-sm mt-1">{h.persona}</p>
+                <p className="mt-2 text-sm">Skor <b className="text-primary">{h.score}/100</b></p>
+              </div>
             ))}
-          </ul>
-        </div>
+          </div>
+        </section>
       )}
+
+      <section id="cara-kerja" className="max-w-6xl mx-auto px-4 mt-16">
+        <h2 className="font-bold text-lg mb-3">Cara Kerja</h2>
+        <ol className="grid sm:grid-cols-3 gap-3">
+          {[["Pilih klien", "Tentukan gaya klien, dari korporat formal sampai agensi kreatif, atau tulis sendiri."],
+            ["Tempel jawaban", "Masukkan transkrip jawaban wawancara, maksimal 1500 karakter."],
+            ["Terima skor dan tips", "Lihat skor, lima aspek penilaian, dan tiga tips briefing."]].map(([t, d], i) => (
+            <li key={t} className="p-4 rounded-xl bg-white border border-line">
+              <p className="font-semibold">{i + 1}. {t}</p><p className="text-sm text-muted mt-1">{d}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section id="tech" className="max-w-6xl mx-auto px-4 mt-12">
+        <h2 className="font-bold text-lg mb-3">Tech Stack</h2>
+        <div className="flex flex-wrap gap-2">
+          {["React", "FastAPI", "Gemini API", "Docker", "AWS EC2"].map((t) => (
+            <span key={t} className="px-3 py-1.5 rounded-full bg-tint text-primary text-sm font-semibold">{t}</span>
+          ))}
+        </div>
+      </section>
+
+      <footer className="mt-16 border-t border-line bg-white">
+        <div className="max-w-6xl mx-auto px-4 py-6 flex flex-wrap justify-between gap-3 text-sm text-muted">
+          <p>Hasil hanya alat bantu, bukan keputusan rekrutmen. Transkrip diproses melalui Gemini API.</p>
+          <div className="flex gap-4">
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="hover:text-primary">GitHub</a>
+            <a href={PORTFOLIO_URL} target="_blank" rel="noreferrer" className="hover:text-primary">Portofolio</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
-
-export default App;
